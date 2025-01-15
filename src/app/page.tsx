@@ -1,91 +1,154 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ChangeEventHandler, useEffect, useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, X } from "lucide-react";
+import AdvocatesTableHeaderRow from "./AdvocatesTableHeaderRow";
+import AdvocatesTableRow from "./AdvocatesTableRow";
+import { Advocate } from "@/db/schema";
+import AdvocatesTableRowLoading from "./AdvocatesTableRowLoading";
 
+
+type HomeState = {
+  advocates: Advocate[] | null;
+  searchTerm: string | null;
+};
 export default function Home() {
-  const [advocates, setAdvocates] = useState([]);
-  const [filteredAdvocates, setFilteredAdvocates] = useState([]);
+  // ----------------------------------------------------------------- //
+  // State
+  // ----------------------------------------------------------------- //
+  const [homeState, setHomeState] = useState<HomeState>({
+    advocates:  null,
+    searchTerm: null,
+  });
+  const { advocates, searchTerm } = homeState;
+  const isLoading = advocates === null;
+
+  console.log('ADVOCATES', advocates)
+
+  const filteredAdvocates = useMemo(
+    () => {
+      if (!searchTerm) return advocates ?? [];
+
+      const result = advocates?.filter((advocate) => {
+        const smallSearchTerm = searchTerm.toLowerCase();
+        const stringTerms = [
+          advocate.firstName.toLowerCase(),
+          advocate.lastName.toLowerCase(),
+          advocate.city.toLowerCase(),
+          advocate.degree.toLowerCase(),
+          ...advocate.specialties.map((s) => s.toLowerCase()),
+        ];
+
+        return (
+          stringTerms.some((term) => term.includes(smallSearchTerm))
+          || advocate.yearsOfExperience >= Number(searchTerm) // TODO: Exact match? All the others are expansive, so keep this one expansive?
+        )
+      })
+
+      return result ?? [];
+    },
+    [advocates, searchTerm]
+  );
+
+  const numFilteredAdvocates = filteredAdvocates.length;
 
   useEffect(() => {
     console.log("fetching advocates...");
-    fetch("/api/advocates").then((response) => {
-      response.json().then((jsonResponse) => {
-        setAdvocates(jsonResponse.data);
-        setFilteredAdvocates(jsonResponse.data);
-      });
+    fetchAdvocates().then(
+      (advocates) => setAdvocates(advocates),
+      (error) => {
+        alert("Error fetching advocates");
+        console.error("Error fetching advocates:", error);
     });
   }, []);
 
-  const onChange = (e) => {
-    const searchTerm = e.target.value;
-
-    document.getElementById("search-term").innerHTML = searchTerm;
-
-    console.log("filtering advocates...");
-    const filteredAdvocates = advocates.filter((advocate) => {
-      return (
-        advocate.firstName.includes(searchTerm) ||
-        advocate.lastName.includes(searchTerm) ||
-        advocate.city.includes(searchTerm) ||
-        advocate.degree.includes(searchTerm) ||
-        advocate.specialties.includes(searchTerm) ||
-        advocate.yearsOfExperience.includes(searchTerm)
-      );
-    });
-
-    setFilteredAdvocates(filteredAdvocates);
+  // ----------------------------------------------------------------- //
+  // Actions
+  // ----------------------------------------------------------------- //
+  const fetchAdvocates = async () => {
+    const response = await fetch("/api/advocates");
+    const jsonResponse = await response.json();
+    return jsonResponse.data;
   };
 
-  const onClick = () => {
-    console.log(advocates);
-    setFilteredAdvocates(advocates);
+  const setAdvocates =
+    (advocates: Advocate[]) => setHomeState({ ...homeState, advocates });
+  const setSearchTerm =
+    (searchTerm: string | null) => setHomeState({ ...homeState, searchTerm });
+
+  const onChange: ChangeEventHandler<HTMLInputElement> = (e) => {
+    const chosenSearchTerm = e.target.value;
+
+    if (!chosenSearchTerm) setSearchTerm(null);
+    else setSearchTerm(chosenSearchTerm);
   };
 
+  const clearSearchTerm = () => setSearchTerm(null);
+
+  // ----------------------------------------------------------------- //
+  // View
+  // ----------------------------------------------------------------- //
   return (
-    <main style={{ margin: "24px" }}>
-      <h1>Solace Advocates</h1>
-      <br />
-      <br />
-      <div>
-        <p>Search</p>
-        <p>
-          Searching for: <span id="search-term"></span>
-        </p>
-        <input style={{ border: "1px solid black" }} onChange={onChange} />
-        <button onClick={onClick}>Reset Search</button>
+    <main className="container mx-auto py-10 space-y-8">
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-4xl font-bold tracking-tight">Solace Advocates</h1>
+        <p className="text-muted-foreground">Manage and view all advocate profiles</p>
       </div>
-      <br />
-      <br />
-      <table>
-        <thead>
-          <th>First Name</th>
-          <th>Last Name</th>
-          <th>City</th>
-          <th>Degree</th>
-          <th>Specialties</th>
-          <th>Years of Experience</th>
-          <th>Phone Number</th>
-        </thead>
-        <tbody>
-          {filteredAdvocates.map((advocate) => {
-            return (
-              <tr>
-                <td>{advocate.firstName}</td>
-                <td>{advocate.lastName}</td>
-                <td>{advocate.city}</td>
-                <td>{advocate.degree}</td>
-                <td>
-                  {advocate.specialties.map((s) => (
-                    <div>{s}</div>
-                  ))}
-                </td>
-                <td>{advocate.yearsOfExperience}</td>
-                <td>{advocate.phoneNumber}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+
+      <div className="flex flex-col space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search advocates..."
+              onChange={onChange}
+              className="pl-8"
+              value={searchTerm || ''}
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1.5 h-7 w-7 p-0"
+                onClick={clearSearchTerm}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          { !isLoading && (
+            <p className="text-sm text-muted-foreground ml-4">
+              Showing {numFilteredAdvocates} results
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-md border">
+        <table className="w-full">
+          <thead className="bg-muted/50">
+            <AdvocatesTableHeaderRow />
+          </thead>
+
+          <tbody>
+            { isLoading ? (
+              <>
+                <AdvocatesTableRowLoading />
+                <AdvocatesTableRowLoading />
+                <AdvocatesTableRowLoading />
+                <AdvocatesTableRowLoading />
+              </>
+            ) : (
+              filteredAdvocates.map(
+                (advocate) => <AdvocatesTableRow key={advocate.id} advocate={advocate} />
+              )
+            )}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }
