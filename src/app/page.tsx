@@ -3,9 +3,7 @@
 import { Advocate, AdvocateSchema } from "@/db/schema"
 import { Button } from "@/components/ui/button"
 import { ChangeEventHandler, use, useCallback, useEffect, useMemo, useState } from "react"
-import { Input } from "@/components/ui/input"
 import { Search, X } from "lucide-react"
-import { debounce, eqCaseInsensitive } from "@/lib/utils"
 import { Array, Effect, Record, Schema, Struct, pipe } from "effect"
 import { useParams, useRouter } from "next/navigation"
 
