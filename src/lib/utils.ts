@@ -50,12 +50,6 @@ export const debounceAsync = <Fn extends (...args: any[]) => Promise<any>>(fn: F
     try {
       // Return a new promise that wraps our debounced call
       return await new Promise((resolve, reject) => {
-        // // Set up the abort handler
-        // signal.addEventListener('abort', () => {
-        //   clearTimeout(timeoutId);
-        //   reject(new Error('Debounced function aborted'));
-        // })
-
         timeoutId = setTimeout(async () => {
           if (signal.aborted) await eternity;
 
