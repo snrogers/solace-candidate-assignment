@@ -38,6 +38,3 @@ next-env.d.ts
 
 # Ask Sebastian about his custom Anthropic editor integration!
 .f2x
-
-# FIXME: REMOVE THIS
-src/components
