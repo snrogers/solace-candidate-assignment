@@ -7,14 +7,14 @@ import { Input } from "@/components/ui/input"
 import { Search, X } from "lucide-react"
 import { debounce, eqCaseInsensitive } from "@/lib/utils"
 import { Array, Effect, Record, Schema, Struct, pipe } from "effect"
+import { useParams, useRouter } from "next/navigation"
 
 import AdvocatesTableHeaderRow from "./AdvocatesTableHeaderRow"
 import AdvocatesTableRow from "./AdvocatesTableRow"
 import AdvocatesTableRowLoading from "./AdvocatesTableRowLoading"
 import AdvocatesSearchInput from "./AdvocatesSearchInput"
 import { useAdvocates } from "./useAdvocates"
-import { useParams, useRouter } from "next/navigation"
-import { PaginationControls } from "@/components/PaginationControls"
+import { PaginationControls } from "./PaginationControls"
 
 const PAGE_SIZE = 10
 
@@ -29,7 +29,6 @@ type HomeProps = {
   searchParams: HomeState
 }
 export default function Home(props: HomeProps) {
-  console.log('homeprops', props)
   const { searchParams } = props;
   const { searchTerm } = searchParams;
   const pageNumber = Number(searchParams.pageNumber ?? 0);

@@ -1,26 +1,15 @@
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { FC } from "react"
 
-interface PaginationControlsProps {
+type PaginationControlsProps = {
   currentPage: number
   isLoading?: boolean
   onPageChange: (page: number) => void
   totalPages: number
 }
-
-export function PaginationControls({
-  currentPage,
-  isLoading,
-  onPageChange,
-  totalPages,
-}: PaginationControlsProps) {
-
-  console.log('paginationcontrols props', {
-    currentPage,
-    isLoading,
-    onPageChange,
-    totalPages,
-  })
+export const PaginationControls: FC<PaginationControlsProps> = (props) => {
+  const { currentPage, isLoading, onPageChange, totalPages } = props
 
   return (
     <div className="flex items-center justify-between px-2 py-4">
