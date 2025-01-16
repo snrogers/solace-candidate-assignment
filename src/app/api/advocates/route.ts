@@ -92,7 +92,6 @@ function withOmnisearch(searchTerm: string) {
       Db.ilike(AdvocatesTable.lastName, searchPattern),
       Db.ilike(AdvocatesTable.city, searchPattern),
       Db.ilike(AdvocatesTable.degree, searchPattern),
-      // Search in the specialties array using the ?| operator
       specialtiesSearch,
     ]
 

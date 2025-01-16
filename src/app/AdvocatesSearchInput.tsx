@@ -56,6 +56,4 @@ const AdvocatesSearchInput: FC<AdvocatesSearchInputProps> = (props) => {
   );
 }
 
-AdvocatesSearchInput.displayName = 'AdvocatesSearchInput';
-
 export default AdvocatesSearchInput;
