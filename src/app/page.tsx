@@ -1,91 +1,65 @@
-"use client";
+"use client"
 
-import { ChangeEventHandler, useEffect, useMemo, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, X } from "lucide-react";
-import AdvocatesTableHeaderRow from "./AdvocatesTableHeaderRow";
-import AdvocatesTableRow from "./AdvocatesTableRow";
-import { Advocate } from "@/db/schema";
-import AdvocatesTableRowLoading from "./AdvocatesTableRowLoading";
+import { Advocate, AdvocateSchema } from "@/db/schema"
+import { Button } from "@/components/ui/button"
+import { ChangeEventHandler, use, useCallback, useEffect, useMemo, useState } from "react"
+import { Input } from "@/components/ui/input"
+import { Search, X } from "lucide-react"
+import { debounce, eqCaseInsensitive } from "@/lib/utils"
+import { Array, Effect, Record, Schema, Struct, pipe } from "effect"
 
+import AdvocatesTableHeaderRow from "./AdvocatesTableHeaderRow"
+import AdvocatesTableRow from "./AdvocatesTableRow"
+import AdvocatesTableRowLoading from "./AdvocatesTableRowLoading"
+import AdvocatesSearchInput from "./AdvocatesSearchInput"
+import { useAdvocates } from "./useAdvocates"
+import { useParams, useRouter } from "next/navigation"
+import { PaginationControls } from "@/components/PaginationControls"
 
+const PAGE_SIZE = 10
+
+// ----------------------------------------------------------------- //
+// Component
+// ----------------------------------------------------------------- //
 type HomeState = {
-  advocates: Advocate[] | null;
-  searchTerm: string | null;
-};
-export default function Home() {
-  // ----------------------------------------------------------------- //
-  // State
-  // ----------------------------------------------------------------- //
-  const [homeState, setHomeState] = useState<HomeState>({
-    advocates:  null,
-    searchTerm: null,
-  });
-  const { advocates, searchTerm } = homeState;
-  const isLoading = advocates === null;
+  searchTerm: string
+  pageNumber?: string
+}
+type HomeProps = {
+  searchParams: HomeState
+}
+export default function Home(props: HomeProps) {
+  console.log('homeprops', props)
+  const { searchParams } = props;
+  const { searchTerm } = searchParams;
+  const pageNumber = Number(searchParams.pageNumber ?? 0);
 
-  console.log('ADVOCATES', advocates)
+  const router = useRouter();
 
-  const filteredAdvocates = useMemo(
-    () => {
-      if (!searchTerm) return advocates ?? [];
-
-      const result = advocates?.filter((advocate) => {
-        const smallSearchTerm = searchTerm.toLowerCase();
-        const stringTerms = [
-          advocate.firstName.toLowerCase(),
-          advocate.lastName.toLowerCase(),
-          advocate.city.toLowerCase(),
-          advocate.degree.toLowerCase(),
-          ...advocate.specialties.map((s) => s.toLowerCase()),
-        ];
-
-        return (
-          stringTerms.some((term) => term.includes(smallSearchTerm))
-          || advocate.yearsOfExperience >= Number(searchTerm) // TODO: Exact match? All the others are expansive, so keep this one expansive?
-        )
-      })
-
-      return result ?? [];
+  const setSearchTerm = useCallback(
+    (searchTerm: string) => {
+      if (searchTerm === '') return router.replace(`/?${new URLSearchParams({ pageNumber: String(pageNumber) })}`)
+      else return router.replace(`/?${new URLSearchParams({ searchTerm, pageNumber: String(pageNumber) })}`)
     },
-    [advocates, searchTerm]
-  );
+    [router, pageNumber]
+  )
 
-  const numFilteredAdvocates = filteredAdvocates.length;
+  const setSearchPage = useCallback(
+    (page: number) => router.replace(`/?${new URLSearchParams({ searchTerm, pageNumber: String(page) })}`),
+    [router, searchTerm]
+  )
 
-  useEffect(() => {
-    console.log("fetching advocates...");
-    fetchAdvocates().then(
-      (advocates) => setAdvocates(advocates),
-      (error) => {
-        alert("Error fetching advocates");
-        console.error("Error fetching advocates:", error);
-    });
-  }, []);
+  const { advocates, error, isLoading, isInitializing, totalCount } = useAdvocates({
+    searchTerm,
+    page: pageNumber,
+    limit: PAGE_SIZE,
+  })
 
-  // ----------------------------------------------------------------- //
-  // Actions
-  // ----------------------------------------------------------------- //
-  const fetchAdvocates = async () => {
-    const response = await fetch("/api/advocates");
-    const jsonResponse = await response.json();
-    return jsonResponse.data;
-  };
-
-  const setAdvocates =
-    (advocates: Advocate[]) => setHomeState({ ...homeState, advocates });
-  const setSearchTerm =
-    (searchTerm: string | null) => setHomeState({ ...homeState, searchTerm });
-
-  const onChange: ChangeEventHandler<HTMLInputElement> = (e) => {
-    const chosenSearchTerm = e.target.value;
-
-    if (!chosenSearchTerm) setSearchTerm(null);
-    else setSearchTerm(chosenSearchTerm);
-  };
-
-  const clearSearchTerm = () => setSearchTerm(null);
+  const numAdvocates  = advocates?.length ?? 0
+  const startRangeStr = numAdvocates === 0
+                        ? 0
+                        : String(pageNumber * PAGE_SIZE + 1)
+  const endRangeStr   = String(Math.min(pageNumber * PAGE_SIZE + numAdvocates, totalCount ?? Number.POSITIVE_INFINITY))
 
   // ----------------------------------------------------------------- //
   // View
@@ -99,56 +73,58 @@ export default function Home() {
 
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search advocates..."
-              onChange={onChange}
-              className="pl-8"
-              value={searchTerm || ''}
-            />
-            {searchTerm && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1.5 h-7 w-7 p-0"
-                onClick={clearSearchTerm}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          <AdvocatesSearchInput
+            onChange={setSearchTerm}
+            isLoading={isLoading}
+            value={searchTerm}
+          />
 
           { !isLoading && (
             <p className="text-sm text-muted-foreground ml-4">
-              Showing {numFilteredAdvocates} results
+              Showing results {startRangeStr} - {endRangeStr} of {totalCount}
             </p>
           )}
         </div>
       </div>
 
       <div className="rounded-md border">
+        <PaginationControls
+          currentPage={pageNumber}
+          totalPages={Math.ceil((totalCount ?? 0) / PAGE_SIZE)} // Assuming 10 items per page
+          onPageChange={setSearchPage}
+          isLoading={isLoading}
+        />
+
         <table className="w-full">
           <thead className="bg-muted/50">
             <AdvocatesTableHeaderRow />
           </thead>
 
           <tbody>
-            { isLoading ? (
-              <>
-                <AdvocatesTableRowLoading />
-                <AdvocatesTableRowLoading />
-                <AdvocatesTableRowLoading />
-                <AdvocatesTableRowLoading />
-              </>
-            ) : (
-              filteredAdvocates.map(
-                (advocate) => <AdvocatesTableRow key={advocate.id} advocate={advocate} />
-              )
-            )}
+            { error && <tr><td colSpan={7} style={{ color: "red", whiteSpace: "pre-wrap" }}>{error.message}</td></tr> }
+            { isInitializing
+              ? <>
+                  <AdvocatesTableRowLoading />
+                  <AdvocatesTableRowLoading />
+                  <AdvocatesTableRowLoading />
+                  <AdvocatesTableRowLoading />
+                </>
+              : advocates?.length === 0
+                ? <tr><td colSpan={7}>No results found</td></tr>
+                : advocates?.map(
+                    (advocate) => <AdvocatesTableRow key={advocate.id} advocate={advocate} />
+                  )
+            }
           </tbody>
         </table>
+
+        <PaginationControls
+          currentPage={pageNumber}
+          totalPages={Math.ceil((advocates?.length ?? 0) / 10)} // Assuming 10 items per page
+          onPageChange={setSearchPage}
+          isLoading={isLoading}
+        />
       </div>
     </main>
-  );
+  )
 }

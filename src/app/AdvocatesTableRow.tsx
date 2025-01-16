@@ -1,10 +1,10 @@
-import { Advocate } from "@/db/schema"
 import { FC } from "react"
+
+import { Advocate } from "@/db/schema"
 
 type AdvocatesTableRowProps = {
   advocate: Advocate
 }
-
 const AdvocatesTableRow: FC<AdvocatesTableRowProps> = (props) => {
   const { advocate } = props
   const {
@@ -17,7 +17,8 @@ const AdvocatesTableRow: FC<AdvocatesTableRowProps> = (props) => {
   } = advocate
 
   // PARANOIA: Deduping specialties to guard against
-  //           duplicating our keys in the JSX
+  //           duplicating our keys in the JSX.
+  // TODO: Consider ensuring that specialties are unique on an Advocate in the DB
   const uniqueSpecialties = advocate.specialties.reduce(
     (acc, curr) => {
       if (acc.includes(curr)) return acc
