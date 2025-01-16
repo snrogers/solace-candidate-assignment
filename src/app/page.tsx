@@ -1,91 +1,127 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
+import { Advocate, AdvocateSchema } from "@/db/schema"
+import { Button } from "@/components/ui/button"
+import { ChangeEventHandler, use, useCallback, useEffect, useMemo, useState } from "react"
+import { Search, X } from "lucide-react"
+import { Array, Effect, Record, Schema, Struct, pipe } from "effect"
+import { useParams, useRouter } from "next/navigation"
 
-export default function Home() {
-  const [advocates, setAdvocates] = useState([]);
-  const [filteredAdvocates, setFilteredAdvocates] = useState([]);
+import AdvocatesTableHeaderRow from "./AdvocatesTableHeaderRow"
+import AdvocatesTableRow from "./AdvocatesTableRow"
+import AdvocatesTableRowLoading from "./AdvocatesTableRowLoading"
+import AdvocatesSearchInput from "./AdvocatesSearchInput"
+import { useAdvocates } from "./useAdvocates"
+import { PaginationControls } from "./PaginationControls"
 
-  useEffect(() => {
-    console.log("fetching advocates...");
-    fetch("/api/advocates").then((response) => {
-      response.json().then((jsonResponse) => {
-        setAdvocates(jsonResponse.data);
-        setFilteredAdvocates(jsonResponse.data);
-      });
-    });
-  }, []);
+const PAGE_SIZE = 10
 
-  const onChange = (e) => {
-    const searchTerm = e.target.value;
+// ----------------------------------------------------------------- //
+// Component
+// ----------------------------------------------------------------- //
+type HomeState = {
+  searchTerm: string
+  pageNumber?: string
+}
+type HomeProps = {
+  searchParams: HomeState
+}
+export default function Home(props: HomeProps) {
+  const { searchParams } = props;
+  const { searchTerm } = searchParams;
+  const pageNumber = Number(searchParams.pageNumber ?? 0);
 
-    document.getElementById("search-term").innerHTML = searchTerm;
+  const router = useRouter();
 
-    console.log("filtering advocates...");
-    const filteredAdvocates = advocates.filter((advocate) => {
-      return (
-        advocate.firstName.includes(searchTerm) ||
-        advocate.lastName.includes(searchTerm) ||
-        advocate.city.includes(searchTerm) ||
-        advocate.degree.includes(searchTerm) ||
-        advocate.specialties.includes(searchTerm) ||
-        advocate.yearsOfExperience.includes(searchTerm)
-      );
-    });
+  const setSearchTerm = useCallback(
+    (searchTerm: string) => {
+      if (searchTerm === '') return router.replace(`/?${new URLSearchParams({ pageNumber: String(pageNumber) })}`)
+      else return router.replace(`/?${new URLSearchParams({ searchTerm, pageNumber: String(pageNumber) })}`)
+    },
+    [router, pageNumber]
+  )
 
-    setFilteredAdvocates(filteredAdvocates);
-  };
+  const setSearchPage = useCallback(
+    (page: number) => router.replace(`/?${new URLSearchParams({ searchTerm, pageNumber: String(page) })}`),
+    [router, searchTerm]
+  )
 
-  const onClick = () => {
-    console.log(advocates);
-    setFilteredAdvocates(advocates);
-  };
+  const { advocates, error, isLoading, isInitializing, totalCount } = useAdvocates({
+    searchTerm,
+    page: pageNumber,
+    limit: PAGE_SIZE,
+  })
 
+  const numAdvocates  = advocates?.length ?? 0
+  const startRangeStr = numAdvocates === 0
+                        ? 0
+                        : String(pageNumber * PAGE_SIZE + 1)
+  const endRangeStr   = String(Math.min(pageNumber * PAGE_SIZE + numAdvocates, totalCount ?? Number.POSITIVE_INFINITY))
+
+  // ----------------------------------------------------------------- //
+  // View
+  // ----------------------------------------------------------------- //
   return (
-    <main style={{ margin: "24px" }}>
-      <h1>Solace Advocates</h1>
-      <br />
-      <br />
-      <div>
-        <p>Search</p>
-        <p>
-          Searching for: <span id="search-term"></span>
-        </p>
-        <input style={{ border: "1px solid black" }} onChange={onChange} />
-        <button onClick={onClick}>Reset Search</button>
+    <main className="container mx-auto py-10 space-y-8">
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-4xl font-bold tracking-tight">Solace Advocates</h1>
+        <p className="text-muted-foreground">Manage and view all advocate profiles</p>
       </div>
-      <br />
-      <br />
-      <table>
-        <thead>
-          <th>First Name</th>
-          <th>Last Name</th>
-          <th>City</th>
-          <th>Degree</th>
-          <th>Specialties</th>
-          <th>Years of Experience</th>
-          <th>Phone Number</th>
-        </thead>
-        <tbody>
-          {filteredAdvocates.map((advocate) => {
-            return (
-              <tr>
-                <td>{advocate.firstName}</td>
-                <td>{advocate.lastName}</td>
-                <td>{advocate.city}</td>
-                <td>{advocate.degree}</td>
-                <td>
-                  {advocate.specialties.map((s) => (
-                    <div>{s}</div>
-                  ))}
-                </td>
-                <td>{advocate.yearsOfExperience}</td>
-                <td>{advocate.phoneNumber}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+
+      <div className="flex flex-col space-y-4">
+        <div className="flex items-center justify-between">
+          <AdvocatesSearchInput
+            onChange={setSearchTerm}
+            isLoading={isLoading}
+            value={searchTerm}
+          />
+
+          { !isLoading && (
+            <p className="text-sm text-muted-foreground ml-4">
+              Showing results {startRangeStr} - {endRangeStr} of {totalCount}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-md border">
+        <PaginationControls
+          currentPage={pageNumber}
+          totalPages={Math.ceil((totalCount ?? 0) / PAGE_SIZE)} // Assuming 10 items per page
+          onPageChange={setSearchPage}
+          isLoading={isLoading}
+        />
+
+        <table className="w-full">
+          <thead className="bg-muted/50">
+            <AdvocatesTableHeaderRow />
+          </thead>
+
+          <tbody>
+            { error && <tr><td colSpan={7} style={{ color: "red", whiteSpace: "pre-wrap" }}>{error.message}</td></tr> }
+            { isInitializing
+              ? <>
+                  <AdvocatesTableRowLoading />
+                  <AdvocatesTableRowLoading />
+                  <AdvocatesTableRowLoading />
+                  <AdvocatesTableRowLoading />
+                </>
+              : advocates?.length === 0
+                ? <tr><td colSpan={7}>No results found</td></tr>
+                : advocates?.map(
+                    (advocate) => <AdvocatesTableRow key={advocate.id} advocate={advocate} />
+                  )
+            }
+          </tbody>
+        </table>
+
+        <PaginationControls
+          currentPage={pageNumber}
+          totalPages={Math.ceil((advocates?.length ?? 0) / 10)} // Assuming 10 items per page
+          onPageChange={setSearchPage}
+          isLoading={isLoading}
+        />
+      </div>
     </main>
-  );
+  )
 }

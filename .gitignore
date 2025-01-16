@@ -34,3 +34,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+# Ask Sebastian about his custom Anthropic editor integration!
+.f2x
